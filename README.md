@@ -91,7 +91,99 @@ msbuild.exe diskann.sln /m /nologo /t:Build /p:Configuration="Release" /property
 
 ## Usage:
 
-Please see the following pages on using the compiled code:
+### Quick Start Guide
+
+Follow these steps to run the diversity-enabled DiskANN algorithm:
+
+#### 1. Download and Prepare Dataset
+
+First, create a data directory and download the SIFT dataset:
+
+```bash
+mkdir data
+cd data
+wget ftp://ftp.irisa.fr/local/texmex/corpus/siftsmall.tar.gz
+tar -xf siftsmall.tar.gz
+cd ..
+```
+
+Convert the dataset from `.fvecs` format to `.bin` format:
+
+```bash
+./build/apps/utils/fvecs_to_bin float data/siftsmall/siftsmall_base.fvecs data/siftsmall/siftsmall_base.fbin
+./build/apps/utils/fvecs_to_bin float data/siftsmall/siftsmall_query.fvecs data/siftsmall/siftsmall_query.fbin
+```
+
+#### 2. Generate Seller File
+
+Generate a seller file for diversity-aware search:
+
+```bash
+python generate_skewed_seller.py --num_vectors 10000 --output_file siftsmall_skewed_sellers.txt
+```
+
+#### 3. Compute Ground Truth
+
+Compute the diverse ground truth for evaluation:
+
+```bash
+./build/apps/utils/compute_diverse_groundtruth --data_type float --dist_fn l2 \
+  --base_file data/siftsmall/siftsmall_base.fbin \
+  --query_file data/siftsmall/siftsmall_query.fbin \
+  --seller_file siftsmall_skewed_sellers.txt \
+  --gt_file siftsmall_skewed_diverse_gt.bin \
+  --K 10 --KperSeller 1
+```
+
+#### 4. Build Index
+
+Build the diversity-enabled memory index:
+
+```bash
+./build/apps/build_memory_index --data_type float --dist_fn l2 \
+  --data_path data/siftsmall/siftsmall_base.fbin \
+  --index_path_prefix siftsmall_skewed_diverse \
+  --max_degree 16 --Lbuild 32 --alpha 1.2 --num_threads 8 \
+  --seller_file siftsmall_skewed_sellers.txt --NumDiverse 10
+```
+
+#### 5. Search Index
+
+Perform diverse search on the built index:
+
+```bash
+./build/apps/search_memory_index --data_type float --dist_fn l2 \
+  --index_path_prefix siftsmall_skewed_diverse \
+  --query_file data/siftsmall/siftsmall_query.fbin \
+  --gt_file siftsmall_skewed_diverse_gt.bin \
+  -K 10 -L 20 30 40 50 60 70 80 90 100 --num_threads 8 \
+  --result_path search_results.txt --diverse_search true \
+  --seller_file siftsmall_skewed_sellers.txt --max_K_per_seller 1
+```
+
+The output I ran on my laptop with siftsmall:
+```
+  Ls         QPS     Avg dist cmps  Mean Latency (mus)   99.9 Latency   Recall@10
+=================================================================================
+  11    48938.04            179.60               67.73         533.30       70.10
+  20   206910.82            250.37               35.14          72.60       75.50
+  30   168548.79            319.22               43.49         108.80       78.90
+  40   180929.98            383.70               41.13         149.60       80.60
+  50   108178.28            450.52               69.47         395.30       82.10
+  60   126502.21            516.67               59.16         133.10       83.30
+  70   108213.40            585.01               69.51         248.60       85.20
+  80   104876.77            648.10               71.76         420.50       86.40
+  90    96683.75            713.31               78.56         531.80       87.60
+ 100    93379.40            774.87               80.61         384.00       89.60
+```
+
+#### Complete Example
+
+For a complete working example, see the commands in `sift_test.sh`.
+
+### Advanced Usage
+
+For more detailed documentation on other features:
 
 - [Commandline interface for building and search SSD based indices](workflows/SSD_index.md)  
 - [Commandline interface for building and search in memory indices](workflows/in_memory_index.md) 
