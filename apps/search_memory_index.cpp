@@ -78,15 +78,15 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
                         const std::string &query_file, const std::string &truthset_file, const uint32_t num_threads,
                         const uint32_t recall_at, const bool print_all_recalls, const std::vector<uint32_t> &Lvec,
                         const bool dynamic, const bool tags, const bool show_qps_per_thread,
-                        const std::vector<std::string> &query_filters, const float fail_if_recall_below, const uint32_t max_K_per_seller = std::numeric_limits<uint32_t>::max(), const bool diverse_search = false, const bool scale_seller_limits = false, const bool post_process = false)
+                        const std::vector<std::string> &query_filters, const float fail_if_recall_below, const uint32_t max_K_per_seller = std::numeric_limits<uint32_t>::max(), const bool diverse_search = false, const bool scale_seller_limits = false, const bool post_process = false, const std::string &seller_file = "")
 {
     std::cout<<max_K_per_seller <<" " << diverse_search <<" " << scale_seller_limits << " " << post_process << std::endl;
     std::vector<uint32_t> location_to_sellers;
-    std::string seller_file = index_path +"_sellers.txt";
-    if (file_exists(seller_file)) {
+    std::string seller_file_path = seller_file.empty() ? (index_path + "_sellers.txt") : seller_file;
+    if (file_exists(seller_file_path)) {
         std::cout<<"Here" << std::endl;
         uint64_t num_pts_seller_file;
-        parse_seller_file(seller_file, num_pts_seller_file, location_to_sellers);
+        parse_seller_file(seller_file_path, num_pts_seller_file, location_to_sellers);
     }
     using TagT = uint32_t;
     // Load the query file
@@ -351,23 +351,23 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
 
     std::cout << "Done searching. Now saving results " << std::endl;
     uint64_t test_id = 0;
-    for (auto L : Lvec)
-    {
-        if (L < recall_at)
-        {
-            diskann::cout << "Ignoring search with L:" << L << " since it's smaller than K:" << recall_at << std::endl;
-            continue;
-        }
-        std::string cur_result_path_prefix = result_path_prefix + "_" + std::to_string(L);
+    // for (auto L : Lvec)
+    // {
+        // if (L < recall_at)
+        // {
+            // diskann::cout << "Ignoring search with L:" << L << " since it's smaller than K:" << recall_at << std::endl;
+            // continue;
+        // }
+        // std::string cur_result_path_prefix = result_path_prefix + "_" + std::to_string(L);
 
-        std::string cur_result_path = cur_result_path_prefix + "_idx_uint32.bin";
-        diskann::save_bin<uint32_t>(cur_result_path, query_result_ids[test_id].data(), query_num, recall_at);
+        // std::string cur_result_path = cur_result_path_prefix + "_idx_uint32.bin";
+        // diskann::save_bin<uint32_t>(cur_result_path, query_result_ids[test_id].data(), query_num, recall_at);
 
-        cur_result_path = cur_result_path_prefix + "_dists_float.bin";
-        diskann::save_bin<float>(cur_result_path, query_result_dists[test_id].data(), query_num, recall_at);
+        // cur_result_path = cur_result_path_prefix + "_dists_float.bin";
+        // diskann::save_bin<float>(cur_result_path, query_result_dists[test_id].data(), query_num, recall_at);
 
-        test_id++;
-    }
+        // test_id++;
+    // }
 
     diskann::aligned_free(query);
     return best_recall >= fail_if_recall_below ? 0 : -1;
@@ -376,7 +376,7 @@ int search_memory_index(diskann::Metric &metric, const std::string &index_path, 
 int main(int argc, char **argv)
 {
     std::string data_type, dist_fn, index_path_prefix, result_path, query_file, gt_file, filter_label, label_type,
-        query_filters_file;
+        query_filters_file, seller_file;
     uint32_t num_threads, K, max_L_per_seller;
     std::vector<uint32_t> Lvec;
     bool print_all_recalls, dynamic, tags, show_qps_per_thread, post_process, diverse_search, scale_seller_limits;
@@ -433,6 +433,8 @@ int main(int argc, char **argv)
         optional_configs.add_options()("post_process",
                                        po::value<bool>(&post_process)->default_value(false),
                                        "Whether to post-processing to ensure correct diversity");
+        optional_configs.add_options()("seller_file", po::value<std::string>(&seller_file)->default_value(""),
+                                       "Path to seller file for diverse search");
 
 
         optional_configs.add_options()(
@@ -533,19 +535,19 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t, uint16_t>(
                     metric, index_path_prefix, result_path, query_file, gt_file, num_threads, K, print_all_recalls,
-                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                    Lvec, dynamic, tags, show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float, uint16_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                             num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                            show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                                                            show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else
             {
@@ -559,19 +561,19 @@ int main(int argc, char **argv)
             {
                 return search_memory_index<int8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                    num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                   show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                                                   show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else if (data_type == std::string("uint8"))
             {
                 return search_memory_index<uint8_t>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                     num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                    show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                                                    show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else if (data_type == std::string("float"))
             {
                 return search_memory_index<float>(metric, index_path_prefix, result_path, query_file, gt_file,
                                                   num_threads, K, print_all_recalls, Lvec, dynamic, tags,
-                                                  show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process);
+                                                  show_qps_per_thread, query_filters, fail_if_recall_below, max_L_per_seller, diverse_search, scale_seller_limits, post_process, seller_file);
             }
             else
             {
