@@ -378,3 +378,19 @@ gperftools
 
 # Rust
 rust/target
+
+# Data directories and datasets
+data/
+*.bin
+*.fvecs
+*.ivecs
+*.fbin
+*.data
+
+# Generated files from diversity modifications
+*.txt
+*.bin
+*.idx
+
+# Test scripts
+sift_test.sh
